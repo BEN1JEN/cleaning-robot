@@ -14,6 +14,7 @@ const MOTOR_LEFT_IN1_PIN: u16 = 24;
 const MOTOR_RIGHT_EN_PIN: u16 = 10;
 const MOTOR_RIGHT_IN0_PIN: u16 = 9;
 const MOTOR_RIGHT_IN1_PIN: u16 = 11;
+const SERVO_PIN: u16 = 2;
 
 struct Motor {
 	en: SysFsGpioOutput,
@@ -162,6 +163,44 @@ enum DriveState {
 	TurnRight(f32),
 }
 
+struct Servo {
+	pwm: SysFsGpioOutput,
+	value: f32,
+	freq: f32,
+	timer: f32,
+	on: bool,
+}
+
+impl Servo {
+	fn new(pin: u16) -> Servo {
+		Servo {
+			pwm: SysFsGpioOutput::open(pin).unwrap(),
+			value: 0.0,
+			freq: 1000.0,
+			timer: 0.0,
+			on: false,
+		}
+	}
+	fn set_value(&mut self, value: f32) {
+		let value = value.clamp(0.0, 1.0);
+		self.value = value;
+	}
+	fn update_pwm(&mut self, delta_time: f32) {
+		self.timer += delta_time;
+		if self.on {
+			if self.timer >= self.value / self.freq {
+				self.on = false;
+				self.pwm.set_low().unwrap();
+				self.timer = 0.0;
+			}
+		} else if self.timer >= (1.0 - self.value) / self.freq {
+			self.on = true;
+			self.pwm.set_high().unwrap();
+			self.timer = 0.0;
+		}
+	}
+}
+
 fn main() {
 	let mut drive = Drive::new(
 		MOTOR_LEFT_EN_PIN,
@@ -174,9 +213,13 @@ fn main() {
 	let mut front_distance = Dist::new(DIST_FRONT_TRIGGER_PIN, DIST_FRONT_ECHO_PIN);
 	let mut left_ground = IrSensor::new(IR_LEFT_PIN);
 	let mut right_ground = IrSensor::new(IR_RIGHT_PIN);
+	let mut servo = Servo::new(SERVO_PIN);
 	let mut last_time = Instant::now();
 
 	let mut state = DriveState::Wonder;
+
+	let mut servo_timer = 0.0;
+	let mut servo_state = false;
 
 	loop {
 		let time = Instant::now();
@@ -185,7 +228,20 @@ fn main() {
 
 		left_ground.update(delta_time);
 		right_ground.update(delta_time);
-		drive.update(delta_time);
+
+		servo_timer -= delta_time;
+		if servo_timer <= 0.0 {
+			servo_state = !servo_state;
+			if servo_state {
+				println!("Open servo");
+				servo_timer = 10.0;
+				servo.set_value(0.2);
+			} else {
+				println!("Close servo");
+				servo_timer = 20.0;
+				servo.set_value(0.4);
+			}
+		}
 
 		let dist = front_distance.get_dist();
 
@@ -203,14 +259,14 @@ fn main() {
 				}
 			},
 			DriveState::TurnLeft(mut t) => {
-				drive.set_drive(-0.4, -0.6);
+				drive.set_drive(-0.6, -0.2);
 				t += delta_time;
 				if t >= 1.0 {
 					state = DriveState::Wonder;
 				}
 			}
 			DriveState::TurnRight(mut t) => {
-				drive.set_drive(-0.4, 0.6);
+				drive.set_drive(-0.6, 0.2);
 				t += delta_time;
 				if t >= 1.0 {
 					state = DriveState::Wonder;
@@ -220,6 +276,9 @@ fn main() {
 				drive.set_drive(-0.4, 0.6);
 			}
 		}
+
+		drive.update(delta_time);
+		servo.update_pwm(delta_time);
 
 		println!("Dist: {:?}", dist);
 		println!("Left: {}", left_ground.sensing());
