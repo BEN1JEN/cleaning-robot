@@ -1,5 +1,6 @@
 use gpio::sysfs::{SysFsGpioInput, SysFsGpioOutput};
 use gpio::{GpioIn, GpioOut, GpioValue};
+use rand::Rng;
 
 use std::time::Instant;
 
@@ -123,7 +124,7 @@ impl Dist {
 		}
 		let time = duration.as_secs_f32();
 		let dist = time*1000000.0/58.0;
-		if 2.0..15.0 {
+		if (2.0..15.0).contains(&dist) {
 			Some(dist)
 		} else {
 			None
@@ -194,9 +195,9 @@ fn main() {
 				if let Some(dist) = dist {
 					if dist < 6.0 {
 						state = if rand::random() {
-							DriveState::TurnLeft
+							DriveState::TurnLeft(rand::thread_rng().gen_range(1.0..2.0))
 						} else {
-							DriveState::TurnRight
+							DriveState::TurnRight(rand::thread_rng().gen_range(1.0..2.0))
 						}
 					}
 				}
@@ -210,6 +211,7 @@ fn main() {
 			}
 			DriveState::TurnRight(mut t) => {
 				drive.set_drive(-0.4, 0.6);
+				t += delta_time;
 				if t >= 1.0 {
 					state = DriveState::Wonder;
 				}
