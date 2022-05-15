@@ -1,5 +1,5 @@
 use gpio::sysfs::{SysFsGpioInput, SysFsGpioOutput};
-use gpio::{GpioIn, GpioOut};
+use gpio::{GpioIn, GpioOut, GpioValue};
 
 use std::time::Instant;
 
@@ -7,9 +7,9 @@ const IR_LEFT_PIN: u16 = 4;
 const IR_RIGHT_PIN: u16 = 17;
 const DIST_FRONT_TRIGGER_PIN: u16 = 27;
 const DIST_FRONT_ECHO_PIN: u16 = 22;
-const MOTOR_LEFT_EN_PIN: u16 = 14;
-const MOTOR_LEFT_IN0_PIN: u16 = 15;
-const MOTOR_LEFT_IN1_PIN: u16 = 18;
+const MOTOR_LEFT_EN_PIN: u16 = 18;
+const MOTOR_LEFT_IN0_PIN: u16 = 23;
+const MOTOR_LEFT_IN1_PIN: u16 = 24;
 const MOTOR_RIGHT_EN_PIN: u16 = 10;
 const MOTOR_RIGHT_IN0_PIN: u16 = 9;
 const MOTOR_RIGHT_IN1_PIN: u16 = 11;
@@ -91,6 +91,39 @@ impl Drive {
 	}
 }
 
+struct Dist {
+	trigger: SysFsGpioOutput,
+	echo: SysFsGpioInput,
+}
+
+impl Dist {
+	fn new(trigger_pin: u16, echo_pin: u16) -> Dist {
+		Dist {
+			trigger: SysFsGpioOutput::open(trigger_pin).unwrap(),
+			echo: SysFsGpioInput::open(echo_pin).unwrap(),
+		}
+	}
+	fn get_dist(&mut self) -> Option<f32> {
+		self.trigger.set_high();
+		std::thread::sleep(std::time::Duration::from_micros(10));
+		self.trigger.set_low();
+		let start_time = Instant::now();
+		while self.echo.read_value().unwrap() == GpioValue::Low  {
+			if start_time.elapsed().as_secs_f32() > 0.1 {
+				return None;
+			}
+		}
+		let mut duration = start_time.elapsed();
+		while self.echo.read_value().unwrap() == GpioValue::High  {
+			duration = start_time.elapsed();
+			if duration.as_secs_f32() > 0.1 {
+				return None;
+			}
+		}
+		return Some(duration.as_secs_f32());
+	}
+}
+
 fn main() {
 	let mut drive = Drive::new(
 		MOTOR_LEFT_EN_PIN,
@@ -100,6 +133,7 @@ fn main() {
 		MOTOR_RIGHT_IN0_PIN,
 		MOTOR_RIGHT_IN1_PIN,
 	);
+	let mut front_distance = Dist::new(DIST_FRONT_TRIGGER_PIN, DIST_FRONT_ECHO_PIN);
 	let mut last_time = Instant::now();
 
 	drive.set_drive(0.0, 1.0);
