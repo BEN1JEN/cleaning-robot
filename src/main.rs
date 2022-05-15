@@ -279,9 +279,5 @@ fn main() {
 
 		drive.update(delta_time);
 		servo.update_pwm(delta_time);
-
-		println!("Dist: {:?}", dist);
-		println!("Left: {}", left_ground.sensing());
-		println!("Right: {}", right_ground.sensing());
 	}
 }
