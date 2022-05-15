@@ -51,7 +51,7 @@ impl Motor {
 				self.in0.set_high().unwrap();
 				self.in1.set_low().unwrap();
 			}
-			self.speed = speed;
+			self.speed = abs_speed;
 		}
 	}
 	fn update_pwm(&mut self, delta_time: f32) {
@@ -137,7 +137,7 @@ fn main() {
 	let mut front_distance = Dist::new(DIST_FRONT_TRIGGER_PIN, DIST_FRONT_ECHO_PIN);
 	let mut last_time = Instant::now();
 
-	drive.set_drive(0.0, 0.2);
+	drive.set_drive(0.6, 0.0);
 	loop {
 		let time = Instant::now();
 		let delta_time = time.duration_since(last_time).as_secs_f32();
