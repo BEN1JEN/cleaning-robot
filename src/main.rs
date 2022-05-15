@@ -110,18 +110,24 @@ impl Dist {
 		self.trigger.set_low().unwrap();
 		let start_time = Instant::now();
 		while self.echo.read_value().unwrap() == GpioValue::Low  {
-			if start_time.elapsed().as_secs_f32() > 0.1 {
+			if start_time.elapsed().as_secs_f32() > 0.005 {
 				return None;
 			}
 		}
 		let mut duration = start_time.elapsed();
 		while self.echo.read_value().unwrap() == GpioValue::High  {
 			duration = start_time.elapsed();
-			if duration.as_secs_f32() > 0.1 {
+			if duration.as_secs_f32() > 0.005 {
 				return None;
 			}
 		}
-		Some(duration.as_secs_f32())
+		let time = duration.as_secs_f32();
+		let dist = time*1000000.0/58.0;
+		if 2.0..15.0 {
+			Some(dist)
+		} else {
+			None
+		}
 	}
 }
 
@@ -148,6 +154,13 @@ impl IrSensor {
 	}
 }
 
+enum DriveState {
+	Off,
+	Wonder,
+	TurnLeft(f32),
+	TurnRight(f32),
+}
+
 fn main() {
 	let mut drive = Drive::new(
 		MOTOR_LEFT_EN_PIN,
@@ -162,7 +175,8 @@ fn main() {
 	let mut right_ground = IrSensor::new(IR_RIGHT_PIN);
 	let mut last_time = Instant::now();
 
-	drive.set_drive(0.6, 0.0);
+	let mut state = DriveState::Wonder;
+
 	loop {
 		let time = Instant::now();
 		let delta_time = time.duration_since(last_time).as_secs_f32();
@@ -172,7 +186,40 @@ fn main() {
 		right_ground.update(delta_time);
 		drive.update(delta_time);
 
-		println!("Dist: {:?}", front_distance.get_dist());
+		let dist = front_distance.get_dist();
+
+		match state {
+			DriveState::Wonder => {
+				drive.set_drive(0.4, 0.0);
+				if let Some(dist) = dist {
+					if dist < 6.0 {
+						state = if rand::random() {
+							DriveState::TurnLeft
+						} else {
+							DriveState::TurnRight
+						}
+					}
+				}
+			},
+			DriveState::TurnLeft(mut t) => {
+				drive.set_drive(-0.4, -0.6);
+				t += delta_time;
+				if t >= 1.0 {
+					state = DriveState::Wonder;
+				}
+			}
+			DriveState::TurnRight(mut t) => {
+				drive.set_drive(-0.4, 0.6);
+				if t >= 1.0 {
+					state = DriveState::Wonder;
+				}
+			}
+			DriveState::Off => {
+				drive.set_drive(-0.4, 0.6);
+			}
+		}
+
+		println!("Dist: {:?}", dist);
 		println!("Left: {}", left_ground.sensing());
 		println!("Right: {}", right_ground.sensing());
 	}
