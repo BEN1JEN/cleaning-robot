@@ -182,7 +182,7 @@ impl Servo {
 		}
 	}
 	fn set_value(&mut self, value: f32) {
-		let value = value.clamp(0.0, 1.0);
+		let value = (value.clamp(0.0, 1.0)+0.037)*0.110;
 		self.value = value;
 	}
 	fn update_pwm(&mut self, delta_time: f32) {
