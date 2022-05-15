@@ -105,9 +105,9 @@ impl Dist {
 		}
 	}
 	fn get_dist(&mut self) -> Option<f32> {
-		self.trigger.set_high();
+		self.trigger.set_high().unwrap();
 		std::thread::sleep(std::time::Duration::from_micros(10));
-		self.trigger.set_low();
+		self.trigger.set_low().unwrap();
 		let start_time = Instant::now();
 		while self.echo.read_value().unwrap() == GpioValue::Low  {
 			if start_time.elapsed().as_secs_f32() > 0.1 {
@@ -121,7 +121,30 @@ impl Dist {
 				return None;
 			}
 		}
-		return Some(duration.as_secs_f32());
+		Some(duration.as_secs_f32())
+	}
+}
+
+struct IrSensor {
+	sense: SysFsGpioInput,
+	timer: f32,
+}
+
+impl IrSensor {
+	fn new(pin: u16) -> IrSensor {
+		IrSensor {
+			sense: SysFsGpioInput::open(pin).unwrap(),
+			timer: 0.0,
+		}
+	}
+	fn update(&mut self, delta_time: f32) {
+		self.timer += delta_time;
+		if self.sense.read_value().unwrap() == GpioValue::High {
+			self.timer = 0.0;
+		}
+	}
+	fn sensing(&self) -> bool {
+		self.timer < 0.2
 	}
 }
 
@@ -135,6 +158,8 @@ fn main() {
 		MOTOR_RIGHT_IN1_PIN,
 	);
 	let mut front_distance = Dist::new(DIST_FRONT_TRIGGER_PIN, DIST_FRONT_ECHO_PIN);
+	let mut left_ground = IrSensor::new(IR_LEFT_PIN);
+	let mut right_ground = IrSensor::new(IR_RIGHT_PIN);
 	let mut last_time = Instant::now();
 
 	drive.set_drive(0.6, 0.0);
@@ -143,8 +168,12 @@ fn main() {
 		let delta_time = time.duration_since(last_time).as_secs_f32();
 		last_time = time;
 
-		//println!("Dist: {:?}", front_distance.get_dist());
-
+		left_ground.update(delta_time);
+		right_ground.update(delta_time);
 		drive.update(delta_time);
+
+		println!("Dist: {:?}", front_distance.get_dist());
+		println!("Left: {}", left_ground.sensing());
+		println!("Right: {}", right_ground.sensing());
 	}
 }
