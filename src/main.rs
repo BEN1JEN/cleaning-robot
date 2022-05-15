@@ -31,7 +31,7 @@ impl Motor {
 			in0: SysFsGpioOutput::open(in0_pin).unwrap(),
 			in1: SysFsGpioOutput::open(in1_pin).unwrap(),
 			speed: 0.0,
-			freq: 1.0,
+			freq: 1000.0,
 			timer: 0.0,
 			on: false,
 		}
@@ -51,19 +51,18 @@ impl Motor {
 				self.in0.set_high().unwrap();
 				self.in1.set_low().unwrap();
 			}
+			self.speed = speed;
 		}
 	}
 	fn update_pwm(&mut self, delta_time: f32) {
 		self.timer += delta_time;
 		if self.on {
 			if self.timer >= self.speed / self.freq {
-				println!("On, {}", self.timer);
 				self.on = false;
 				self.en.set_low().unwrap();
 				self.timer = 0.0;
 			}
 		} else if self.timer >= (1.0 - self.speed) / self.freq {
-			println!("Off, {}", self.timer);
 			self.on = true;
 			self.en.set_high().unwrap();
 			self.timer = 0.0;
