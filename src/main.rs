@@ -57,15 +57,15 @@ impl Motor {
 		self.timer += delta_time;
 		if self.on {
 			if self.timer >= self.speed / self.freq {
-				println!("On");
+				println!("On, {}", self.timer);
 				self.on = false;
-				self.en.set_high().unwrap();
+				self.en.set_low().unwrap();
 				self.timer = 0.0;
 			}
 		} else if self.timer >= (1.0 - self.speed) / self.freq {
-			println!("Off");
+			println!("Off, {}", self.timer);
 			self.on = true;
-			self.en.set_low().unwrap();
+			self.en.set_high().unwrap();
 			self.timer = 0.0;
 		}
 	}
@@ -144,7 +144,7 @@ fn main() {
 		let delta_time = time.duration_since(last_time).as_secs_f32();
 		last_time = time;
 
-		println!("Dist: {:?}", dist.get_dist());
+		//println!("Dist: {:?}", front_distance.get_dist());
 
 		drive.update(delta_time);
 	}
