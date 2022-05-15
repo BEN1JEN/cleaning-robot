@@ -58,12 +58,12 @@ impl Motor {
 		if self.on {
 			if self.timer >= self.speed / self.freq {
 				self.on = false;
-				self.en.set_low().unwrap();
+				self.en.set_high().unwrap();
 				self.timer = 0.0;
 			}
 		} else if self.timer >= (1.0 - self.speed) / self.freq {
 			self.on = true;
-			self.en.set_high().unwrap();
+			self.en.set_low().unwrap();
 			self.timer = 0.0;
 		}
 	}
